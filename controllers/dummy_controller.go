@@ -32,8 +32,6 @@ import (
 	interviewv1alpha1 "github.com/Amila-Rukshan/dummy-operator/api/v1alpha1"
 )
 
-const dummyFinalizer = "interview.com/dummy-finalizer"
-
 // DummyReconciler reconciles a Dummy object
 type DummyReconciler struct {
 	client.Client
@@ -85,7 +83,7 @@ func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		if errors.IsNotFound(err) {
 			// pod was deleted or not created
 			// create the pod resoruce artifact
-			pod, err := r.createNginxPod(&dummy)
+			pod, err := r.createPod(&dummy)
 			if err != nil {
 				log.Error(err, "Failed to define new Pod resource for the Dummy object")
 				return ctrl.Result{}, err
@@ -105,21 +103,13 @@ func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return ctrl.Result{}, err
 	}
 
-	// if the pod does not include the dummy object as owner reference then add it,
-	// to take control over the existing pod
-	if !metav1.IsControlledBy(&pod, &dummy) {
-		if err := controllerutil.SetControllerReference(&dummy, &pod, r.Scheme); err != nil {
-			log.Error(err, "Failed to set owner reference to the pod")
-			return ctrl.Result{}, err
-		}
-
-		// update the pod
-		if err := r.Update(ctx, &pod); err != nil {
-			log.Error(err, "Failed to update the pod")
-			return ctrl.Result{}, err
-		}
+	// update the pod to desired state
+	if err := r.updatePod(ctx, &dummy, &pod); err != nil {
+		log.Error(err, "Failed to update the pod to desired state")
+		return ctrl.Result{}, err
 	}
 
+	// update the dummy status
 	if err := r.updateDummyStatus(ctx, &dummy, &pod); err != nil {
 		log.Error(err, "Failed to update the dummy status")
 		return ctrl.Result{}, err
@@ -128,8 +118,31 @@ func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 	return ctrl.Result{}, nil
 }
 
-// createNginxPod creates the nginx pod with the same name and namespace as the dummy object
-func (r *DummyReconciler) createNginxPod(dummy *interviewv1alpha1.Dummy) (*corev1.Pod, error) {
+// updatePod updates the pod by adding controller reference and changing container spec to only run nginx
+func (r *DummyReconciler) updatePod(ctx context.Context, dummy *interviewv1alpha1.Dummy, pod *corev1.Pod) error {
+	// check if the pod is running nginx
+	if pod.Spec.Containers[0].Image != "nginx:latest" {
+		pod.Spec.Containers[0].Image = "nginx:latest"
+	}
+
+	// if the pod does not include the dummy object as owner reference then add it,
+	// to take control over the existing pod
+	if !metav1.IsControlledBy(pod, dummy) {
+		if err := controllerutil.SetControllerReference(dummy, pod, r.Scheme); err != nil {
+			return err
+		}
+	}
+
+	// update the pod
+	if err := r.Update(ctx, pod); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// createPod creates the nginx pod with the same name and namespace as the dummy object
+func (r *DummyReconciler) createPod(dummy *interviewv1alpha1.Dummy) (*corev1.Pod, error) {
 	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      dummy.Name,
@@ -153,7 +166,7 @@ func (r *DummyReconciler) createNginxPod(dummy *interviewv1alpha1.Dummy) (*corev
 	return &pod, nil
 }
 
-// updateDummyStatus update the status of dummy resource
+// updateDummyStatus updates the status of dummy resource
 func (r *DummyReconciler) updateDummyStatus(ctx context.Context, dummy *interviewv1alpha1.Dummy, pod *corev1.Pod) error {
 	// update the dummy status with spec.Message
 	if dummy.Status.SpecEcho != dummy.Spec.Message {
