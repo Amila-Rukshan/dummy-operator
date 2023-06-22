@@ -19,3 +19,22 @@ Execute the following commands from the root directory of the project to test th
     ```
     kubectl delete -f config/samples/dummy.yaml 
     ```
+### Other test scenarios
+
+1. When a pod already exists with the same name as the `Dummy` resource
+
+    * Create a pod with the same name as the Dummy resource and which is not running nginx pod
+        ```
+        kubectl run dumm1 --image httpd
+        ```
+    * Then, apply the sample dummy resource:
+        ```
+        kubectl apply -f config/samples/dummy.yaml 
+        ```
+    Pod will be updated to run nginx container
+
+    * Deletion of `Dummy` resource will remove the controlled pod as well 
+
+2. After applying the `Dummy` resource, delete the pod it created. A new pod will be created. 
+
+3. Change the image of the pod created by the `Dummy` resource
