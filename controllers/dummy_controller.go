@@ -32,6 +32,8 @@ import (
 	interviewv1alpha1 "github.com/Amila-Rukshan/dummy-operator/api/v1alpha1"
 )
 
+const containerImageName = "nginx:latest"
+
 // DummyReconciler reconciles a Dummy object
 type DummyReconciler struct {
 	client.Client
@@ -121,8 +123,8 @@ func (r *DummyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 // updatePod updates the pod by adding controller reference and changing container spec to only run nginx
 func (r *DummyReconciler) updatePod(ctx context.Context, dummy *interviewv1alpha1.Dummy, pod *corev1.Pod) error {
 	// check if the pod is running nginx
-	if pod.Spec.Containers[0].Image != "nginx:latest" {
-		pod.Spec.Containers[0].Image = "nginx:latest"
+	if pod.Spec.Containers[0].Image != containerImageName {
+		pod.Spec.Containers[0].Image = containerImageName
 	}
 
 	// if the pod does not include the dummy object as owner reference then add it,
@@ -152,7 +154,7 @@ func (r *DummyReconciler) createPod(dummy *interviewv1alpha1.Dummy) (*corev1.Pod
 			Containers: []corev1.Container{
 				{
 					Name:  "nginx-container",
-					Image: "nginx:latest",
+					Image: containerImageName,
 				},
 			},
 		},
